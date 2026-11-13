@@ -1,0 +1,8 @@
+CREATE ROLE orders_app LOGIN PASSWORD 'orders_local' NOSUPERUSER NOCREATEDB NOCREATEROLE;
+CREATE ROLE inventory_app LOGIN PASSWORD 'inventory_local' NOSUPERUSER NOCREATEDB NOCREATEROLE;
+CREATE ROLE debugger LOGIN PASSWORD 'debugger_local' NOSUPERUSER NOCREATEDB NOCREATEROLE;
+CREATE SCHEMA orders AUTHORIZATION orders_app;
+CREATE SCHEMA inventory AUTHORIZATION inventory_app;
+GRANT CONNECT ON DATABASE debugger TO orders_app, inventory_app, debugger;
+GRANT USAGE ON SCHEMA inventory TO debugger;
+GRANT pg_read_all_stats TO debugger;

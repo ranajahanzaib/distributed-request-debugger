@@ -1,0 +1,128 @@
+services:
+  postgres:
+    image: postgres:17.11
+    environment:
+      POSTGRES_DB: debugger
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: localpostgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d debugger"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    volumes:
+      [
+        pgdata:/var/lib/postgresql/data,
+        "./deploy/postgres/init:/docker-entrypoint-initdb.d:ro",
+      ]
+
+  tempo:
+    image: grafana/tempo:2.10.10
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      ["./deploy/tempo/tempo.yaml:/etc/tempo.yaml:ro", "tempodata:/var/tempo"]
+    ports: ["127.0.0.1:3200:3200"]
+    healthcheck:
+      test: ["CMD", "/tempo", "--health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.164.1
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes: ["./deploy/otel/collector.yaml:/etc/otelcol/config.yaml:ro"]
+    depends_on:
+      tempo: { condition: service_healthy }
+
+  prometheus:
+    image: prom/prometheus:v3.13.5
+    command: ["--config.file=/etc/prometheus/prometheus.yml"]
+    volumes:
+      ["./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro"]
+    ports: ["127.0.0.1:9090:9090"]
+
+  grafana:
+    image: grafana/grafana:13.3.0
+    ports: ["127.0.0.1:3000:3000"]
+    volumes:
+      - "./deploy/grafana/provisioning:/etc/grafana/provisioning:ro"
+      - "./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro"
+    depends_on: [tempo, prometheus]
+
+  auth:
+    build: .
+    environment:
+      SERVICE_NAME: auth
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
+    depends_on:
+      otel-collector: { condition: service_started }
+
+  orders:
+    build: .
+    environment:
+      SERVICE_NAME: orders
+      DATABASE_URL: postgres://orders_app:orders_local@postgres:5432/debugger?sslmode=disable
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
+    depends_on:
+      postgres: { condition: service_healthy }
+      otel-collector: { condition: service_started }
+
+  inventory:
+    build: .
+    environment:
+      SERVICE_NAME: inventory
+      DATABASE_URL: postgres://inventory_app:inventory_local@postgres:5432/debugger?sslmode=disable
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
+      WAIT_OBSERVER_ENABLED: "true"
+    depends_on:
+      orders: { condition: service_healthy }
+      postgres: { condition: service_healthy }
+
+  payment:
+    build: .
+    environment:
+      SERVICE_NAME: payment
+      DEMO_MODE: "true"
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
+    depends_on:
+      otel-collector: { condition: service_started }
+
+  gateway:
+    build: .
+    environment:
+      SERVICE_NAME: gateway
+      DEMO_MODE: "true"
+      PORT: "8080"
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
+      AUTH_URL: http://auth:8080
+      ORDERS_URL: http://orders:8080
+      INVENTORY_URL: http://inventory:8080
+      PAYMENT_URL: http://payment:8080
+    ports: ["127.0.0.1:8080:8080"]
+    depends_on:
+      auth: { condition: service_healthy }
+      orders: { condition: service_healthy }
+      inventory: { condition: service_healthy }
+      payment: { condition: service_healthy }
+      otel-collector: { condition: service_started }
+
+  debugger:
+    build: .
+    environment:
+      SERVICE_NAME: debugger
+      DEMO_MODE: "true"
+      DATABASE_URL: postgres://debugger:debugger_local@postgres:5432/debugger?sslmode=disable
+      GATEWAY_URL: http://gateway:8080
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
+      TEMPO_URL: http://tempo:3200
+    ports: ["127.0.0.1:8081:8080"]
+    depends_on:
+      tempo: { condition: service_healthy }
+      postgres: { condition: service_healthy }
+      gateway: { condition: service_healthy }
+      otel-collector: { condition: service_started }
+
+volumes:
+  pgdata: {}
+  tempodata: {}
