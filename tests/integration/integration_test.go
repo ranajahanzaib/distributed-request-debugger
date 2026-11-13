@@ -57,17 +57,19 @@ func getTrace(t *testing.T, id string) *analysis.Report {
 	t.Helper()
 	c := tempo.New(env("TEMPO_URL", "http://127.0.0.1:3200"))
 	deadline := time.Now().Add(30 * time.Second)
+	var last error
 	for time.Now().Before(deadline) {
 		ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
 		tr, e := c.Fetch(ctx, id)
 		cancel()
+		last = e
 		if e == nil {
 			r := analysis.Analyze(tr)
 			return &r
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
-	t.Fatalf("trace %s did not become available in Tempo", id)
+	t.Fatalf("trace %s did not become available in Tempo: last error: %v", id, last)
 	return nil
 }
 func TestHealthyEndToEndPropagation(t *testing.T) {
