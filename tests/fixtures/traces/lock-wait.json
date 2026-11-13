@@ -1,0 +1,87 @@
+{
+  "batches": [
+    {
+      "resource": {
+        "attributes": [
+          { "key": "service.name", "value": { "stringValue": "gateway" } }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "spans": [
+            {
+              "traceId": "11111111111111111111111111111111",
+              "spanId": "aaaaaaaaaaaaaaaa",
+              "name": "checkout",
+              "kind": 2,
+              "startTimeUnixNano": "10000000000",
+              "endTimeUnixNano": "20000000000",
+              "status": { "code": 1 }
+            },
+            {
+              "traceId": "11111111111111111111111111111111",
+              "spanId": "bbbbbbbbbbbbbbbb",
+              "parentSpanId": "aaaaaaaaaaaaaaaa",
+              "name": "inventory.reserve",
+              "kind": 3,
+              "startTimeUnixNano": "11000000000",
+              "endTimeUnixNano": "19500000000",
+              "attributes": [
+                {
+                  "key": "service.name",
+                  "value": { "stringValue": "inventory" }
+                }
+              ],
+              "status": { "code": 1 }
+            },
+            {
+              "traceId": "11111111111111111111111111111111",
+              "spanId": "cccccccccccccccc",
+              "parentSpanId": "bbbbbbbbbbbbbbbb",
+              "name": "inventory.db.reserve_stock",
+              "kind": 1,
+              "startTimeUnixNano": "11500000000",
+              "endTimeUnixNano": "19000000000",
+              "attributes": [
+                {
+                  "key": "service.name",
+                  "value": { "stringValue": "inventory" }
+                },
+                {
+                  "key": "db.system",
+                  "value": { "stringValue": "postgresql" }
+                },
+                { "key": "db.wait.type", "value": { "stringValue": "Lock" } },
+                {
+                  "key": "db.wait.event",
+                  "value": { "stringValue": "transactionid" }
+                },
+                {
+                  "key": "db.wait.observation_count",
+                  "value": { "intValue": "188" }
+                },
+                {
+                  "key": "db.wait.blocking_pids",
+                  "value": { "stringValue": "[42]" }
+                }
+              ],
+              "events": [
+                {
+                  "name": "wait observed",
+                  "timeUnixNano": "12000000000",
+                  "attributes": [
+                    {
+                      "key": "wait_event_type",
+                      "value": { "stringValue": "Lock" }
+                    }
+                  ]
+                }
+              ],
+              "status": { "code": 1 }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
