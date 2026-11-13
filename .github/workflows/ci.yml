@@ -39,7 +39,7 @@ jobs:
       - name: Wait for gateway and debugger
         run: |
           for i in $(seq 1 120); do
-            if curl -fsS http://127.0.0.1:8080/healthz >/dev/null && curl -fsS http://127.0.0.1:8081/api/health >/dev/null; then exit 0; fi
+            if curl -fsS http://127.0.0.1:8080/healthz >/dev/null && curl -fsS http://127.0.0.1:8081/api/health >/dev/null && curl -fsS http://127.0.0.1:3200/ready >/dev/null; then exit 0; fi
             sleep 2
           done
           docker compose ps
