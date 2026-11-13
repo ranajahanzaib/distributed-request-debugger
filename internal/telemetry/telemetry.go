@@ -36,7 +36,11 @@ func Init(ctx context.Context, service string) (func(context.Context) error, err
 	if e != nil {
 		return nil, e
 	}
-	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exp), sdktrace.WithResource(res), sdktrace.WithSampler(sdktrace.AlwaysSample()))
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exp, sdktrace.WithBatchTimeout(50*time.Millisecond)),
+		sdktrace.WithResource(res),
+		sdktrace.WithSampler(sdktrace.AlwaysSample()),
+	)
 	otel.SetTracerProvider(tp)
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
 	return tp.Shutdown, nil

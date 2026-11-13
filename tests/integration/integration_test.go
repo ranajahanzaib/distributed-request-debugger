@@ -56,7 +56,7 @@ func runCheckout(t *testing.T, key string) (checkoutResult, int) {
 func getTrace(t *testing.T, id string) *analysis.Report {
 	t.Helper()
 	c := tempo.New(env("TEMPO_URL", "http://127.0.0.1:3200"))
-	deadline := time.Now().Add(20 * time.Second)
+	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
 		ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
 		tr, e := c.Fetch(ctx, id)
@@ -65,7 +65,7 @@ func getTrace(t *testing.T, id string) *analysis.Report {
 			r := analysis.Analyze(tr)
 			return &r
 		}
-		time.Sleep(250 * time.Millisecond)
+		time.Sleep(500 * time.Millisecond)
 	}
 	t.Fatalf("trace %s did not become available in Tempo", id)
 	return nil

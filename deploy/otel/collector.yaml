@@ -9,7 +9,9 @@ processors:
   memory_limiter:
     check_interval: 1s
     limit_mib: 256
-  batch: {}
+  batch:
+    timeout: 100ms
+    send_batch_size: 10
 exporters:
   otlp/tempo:
     endpoint: tempo:4317

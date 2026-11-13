@@ -33,6 +33,7 @@ func (c *Client) Fetch(ctx context.Context, id string) (*trace.Trace, error) {
 	if e != nil {
 		return nil, e
 	}
+	req.Header.Set("Accept", "application/json")
 	resp, e := c.HTTP.Do(req)
 	if e != nil {
 		return nil, fmt.Errorf("Tempo unavailable: %w", e)
