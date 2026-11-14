@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -59,13 +60,13 @@ type rawSpan struct {
 	SpanID     string      `json:"spanId"`
 	Parent     string      `json:"parentSpanId"`
 	Name       string      `json:"name"`
-	Kind       int         `json:"kind"`
+	Kind       enumInt     `json:"kind"`
 	Start      json.Number `json:"startTimeUnixNano"`
 	End        json.Number `json:"endTimeUnixNano"`
 	Attributes []kv        `json:"attributes"`
 	Status     struct {
-		Code    int    `json:"code"`
-		Message string `json:"message"`
+		Code    enumInt `json:"code"`
+		Message string  `json:"message"`
 	} `json:"status"`
 	Events []struct {
 		Name       string      `json:"name"`
@@ -152,7 +153,7 @@ func Parse(data []byte) (*Trace, error) {
 			}
 			events = append(events, Event{Name: ev.Name, Time: ts, Attributes: ea})
 		}
-		s := &Span{TraceID: sp.TraceID, SpanID: sp.SpanID, ParentSpanID: sp.Parent, Service: svc, Name: sp.Name, Kind: sp.Kind, Start: start, End: end, Status: status, Attributes: attrs, Events: events}
+		s := &Span{TraceID: sp.TraceID, SpanID: sp.SpanID, ParentSpanID: sp.Parent, Service: svc, Name: sp.Name, Kind: int(sp.Kind), Start: start, End: end, Status: status, Attributes: attrs, Events: events}
 		t.Spans = append(t.Spans, s)
 	}
 	for _, b := range r.Batches {
@@ -258,6 +259,41 @@ func value(v rawValue) any {
 		return string(v.Array)
 	case len(v.Kv) > 0:
 		return string(v.Kv)
+	}
+	return nil
+}
+
+// enumInt decodes OTLP enums that JSON encoders emit as either numbers or
+// names (e.g. Tempo returns "SPAN_KIND_CLIENT", "STATUS_CODE_ERROR").
+type enumInt int
+
+func (e *enumInt) UnmarshalJSON(b []byte) error {
+	var n int
+	if err := json.Unmarshal(b, &n); err == nil {
+		*e = enumInt(n)
+		return nil
+	}
+	var str string
+	if err := json.Unmarshal(b, &str); err != nil {
+		return err
+	}
+	switch strings.ToUpper(str) {
+	case "SPAN_KIND_INTERNAL":
+		*e = 1
+	case "SPAN_KIND_SERVER":
+		*e = 2
+	case "SPAN_KIND_CLIENT":
+		*e = 3
+	case "SPAN_KIND_PRODUCER":
+		*e = 4
+	case "SPAN_KIND_CONSUMER":
+		*e = 5
+	case "STATUS_CODE_OK":
+		*e = 1
+	case "STATUS_CODE_ERROR":
+		*e = 2
+	default:
+		*e = 0
 	}
 	return nil
 }
