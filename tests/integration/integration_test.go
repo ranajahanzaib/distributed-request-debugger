@@ -144,8 +144,8 @@ func TestUpstreamTimeout(t *testing.T) {
 }
 func TestComparisonReportsMeasuredDifference(t *testing.T) {
 	requireEnabled(t)
-	a, sa := runCheckout(t, fmt.Sprintf("compare-healthy-%d", time.Now().UnixNano()))
-	b, sb := runCheckout(t, fmt.Sprintf("compare-slow-payment-%d", time.Now().UnixNano()))
+	a, sa := runCheckout(t, fmt.Sprintf("healthy-compare-%d", time.Now().UnixNano()))
+	b, sb := runCheckout(t, fmt.Sprintf("slow-payment-compare-%d", time.Now().UnixNano()))
 	if sa != 200 || sb != 200 {
 		t.Fatalf("comparison scenarios: %d %d", sa, sb)
 	}
