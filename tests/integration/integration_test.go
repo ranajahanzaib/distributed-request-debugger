@@ -62,10 +62,18 @@ func getTrace(t *testing.T, id string) *analysis.Report {
 		ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
 		tr, e := c.Fetch(ctx, id)
 		cancel()
-		last = e
+		if e != nil {
+			last = e
+		}
 		if e == nil {
 			r := analysis.Analyze(tr)
-			return &r
+			// Tempo can serve a partial trace while spans are still being flushed;
+			// only accept it once it is structurally complete and covers every service.
+			if missing := missingServices(r); r.TraceComplete && len(missing) == 0 {
+				return &r
+			} else {
+				last = fmt.Errorf("partial trace (%d spans, complete=%v, missing services=%v, warnings=%v)", r.SpansAnalyzed, r.TraceComplete, missing, r.Warnings)
+			}
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
@@ -180,4 +188,18 @@ func TestServicesUseNonSuperuserDatabaseRole(t *testing.T) {
 	if superuser {
 		t.Fatal("debugger database role must not be a superuser")
 	}
+}
+
+func missingServices(r analysis.Report) []string {
+	have := map[string]bool{}
+	for _, s := range r.Services {
+		have[s] = true
+	}
+	var missing []string
+	for _, n := range []string{"gateway", "auth", "orders", "inventory", "payment"} {
+		if !have[n] {
+			missing = append(missing, n)
+		}
+	}
+	return missing
 }
