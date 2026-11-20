@@ -79,9 +79,9 @@ func (c *Client) Search(ctx context.Context, limit int, minDuration time.Duratio
 	q.Set("limit", strconv.Itoa(limit))
 	q.Set("start", strconv.FormatInt(time.Now().Add(-24*time.Hour).Unix(), 10))
 	q.Set("end", strconv.FormatInt(time.Now().Unix(), 10))
-	q.Set("q", `{resource.service.name="gateway"}`)
+	q.Set("q", `{resource.service.name="gateway" && name != "GET /healthz"}`)
 	if minDuration > 0 {
-		q.Set("q", fmt.Sprintf(`{resource.service.name="gateway" && duration > %s}`, minDuration))
+		q.Set("q", fmt.Sprintf(`{resource.service.name="gateway" && name != "GET /healthz" && duration > %s}`, minDuration))
 	}
 	req, e := http.NewRequestWithContext(ctx, http.MethodGet, c.BaseURL+"/api/search?"+q.Encode(), nil)
 	if e != nil {

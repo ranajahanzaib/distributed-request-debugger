@@ -184,7 +184,7 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 	if len(ts) == 0 {
 		fmt.Fprint(w, "<tr><td colspan='4'>No traces found</td></tr>")
 	}
-	fmt.Fprint(w, "</table><section><h2>Compare traces</h2><label>Before <input id='before' inputmode='text' pattern='[0-9a-fA-F]{32}'></label> <label>After <input id='after' inputmode='text' pattern='[0-9a-fA-F]{32}'></label> <button id='compare'>Compare</button><pre id='comparison' aria-live='polite'></pre></section><script>document.getElementById('compare').onclick=async()=>{const out=document.getElementById('comparison');const q=new URLSearchParams({before:document.getElementById('before').value.trim(),after:document.getElementById('after').value.trim()});out.textContent='Loading…';try{const r=await fetch('/api/comparisons?'+q);const b=await r.json();out.textContent=JSON.stringify(b,null,2)}catch(e){out.textContent=String(e)}}</script><p><a href='/api/health'>Backend health</a> · <a href='http://localhost:3000'>Grafana</a></p>")
+	fmt.Fprint(w, "</table><section><h2>Compare traces</h2><label>Before <input id='before' inputmode='text' pattern='[0-9a-fA-F]{32}'></label> <label>After <input id='after' inputmode='text' pattern='[0-9a-fA-F]{32}'></label> <button id='compare'>Compare</button><pre id='comparison' aria-live='polite'></pre></section><script>document.getElementById('compare').onclick=async()=>{const out=document.getElementById('comparison');const q=new URLSearchParams({before:document.getElementById('before').value.trim(),after:document.getElementById('after').value.trim()});out.textContent='Loading…';try{const r=await fetch('/api/comparisons?'+q);const b=await r.json();out.textContent=JSON.stringify(b,null,2)}catch(e){out.textContent=String(e)}};const qp=new URLSearchParams(location.search);if(qp.get('before'))document.getElementById('before').value=qp.get('before');if(qp.get('after'))document.getElementById('after').value=qp.get('after');if(qp.get('before')&&qp.get('after'))document.getElementById('compare').click();</script><p><a href='/api/health'>Backend health</a> · <a href='http://localhost:3000'>Grafana</a></p>")
 }
 func (s *Server) tracePage(w http.ResponseWriter, r *http.Request) {
 	t, ok := s.fetch(w, r)
@@ -201,10 +201,31 @@ func (s *Server) tracePage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	fmt.Fprintf(w, "<!doctype html><meta name='viewport' content='width=device-width'><title>Trace</title><style>body{font:15px system-ui;max-width:1100px;margin:32px auto;padding:0 18px;background:#f6f7f8;color:#17212b}.row{display:grid;grid-template-columns:240px 1fr 90px;gap:8px;margin:7px 0}.track{height:18px;background:#e5e9ed;position:relative}.bar{height:100%%;background:#3977a8;position:absolute}code{font:12px monospace}</style><a href='/'>← Recent traces</a><h1>Trace diagnosis</h1><p><code>%s</code> · %.1f ms · %d spans · %d services</p>", html.EscapeString(t.TraceID), report.DurationMS, len(t.Spans), len(t.Services))
+	fmt.Fprintf(w, "<!doctype html><meta name='viewport' content='width=device-width'><title>Trace</title><style>body{font:15px system-ui;max-width:1100px;margin:32px auto;padding:0 18px;background:#f6f7f8;color:#17212b}.row{display:grid;grid-template-columns:240px 1fr 90px;gap:8px;margin:7px 0}.track{height:18px;background:#e5e9ed;position:relative}.bar{height:100%%;background:#3977a8;position:absolute}code{font:12px monospace}ul{padding-left:20px;line-height:1.5}</style><a href='/'>← Recent traces</a><h1>Trace diagnosis</h1><p><code>%s</code> · %.1f ms · %d spans · %d services</p>", html.EscapeString(t.TraceID), report.DurationMS, len(t.Spans), len(t.Services))
 	if report.PrimaryFinding != nil {
 		f := report.PrimaryFinding
 		fmt.Fprintf(w, "<h2>%s</h2><p>%s (%s confidence, %.1f ms)</p>", html.EscapeString(f.Category), html.EscapeString(f.Summary), html.EscapeString(f.Confidence), f.DurationMS)
+		if len(f.Evidence) > 0 {
+			fmt.Fprint(w, "<h3>Evidence</h3><ul>")
+			for _, ev := range f.Evidence {
+				fmt.Fprintf(w, "<li>%s</li>", html.EscapeString(ev))
+			}
+			fmt.Fprint(w, "</ul>")
+		}
+		if len(f.NextSteps) > 0 {
+			fmt.Fprint(w, "<h3>Next steps</h3><ul>")
+			for _, step := range f.NextSteps {
+				fmt.Fprintf(w, "<li>%s</li>", html.EscapeString(step))
+			}
+			fmt.Fprint(w, "</ul>")
+		}
+	}
+	if len(report.Warnings) > 0 {
+		fmt.Fprint(w, "<h3>Warnings</h3><ul>")
+		for _, warn := range report.Warnings {
+			fmt.Fprintf(w, "<li>%s</li>", html.EscapeString(warn))
+		}
+		fmt.Fprint(w, "</ul>")
 	}
 	fmt.Fprint(w, "<h2>Waterfall</h2>")
 	for _, sp := range t.Spans {

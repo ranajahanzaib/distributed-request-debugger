@@ -1,6 +1,8 @@
 package trace
 
 import (
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -106,25 +108,28 @@ func Parse(data []byte) (*Trace, error) {
 	seen := map[string]bool{}
 	services := map[string]bool{}
 	add := func(rs []kv, sp rawSpan) {
+		spTraceID := normalizeID(sp.TraceID, 16)
+		spSpanID := normalizeID(sp.SpanID, 8)
+		spParentID := normalizeID(sp.Parent, 8)
 		if t.TraceID == "" {
-			t.TraceID = sp.TraceID
-		} else if sp.TraceID != "" && sp.TraceID != t.TraceID {
+			t.TraceID = spTraceID
+		} else if spTraceID != "" && spTraceID != t.TraceID {
 			t.Warnings = append(t.Warnings, "span from a different trace ID skipped")
 			return
 		}
-		if sp.SpanID == "" {
+		if spSpanID == "" {
 			t.Warnings = append(t.Warnings, "span with missing ID skipped")
 			return
 		}
-		if seen[sp.SpanID] {
-			t.Warnings = append(t.Warnings, "duplicate span ID: "+sp.SpanID)
+		if seen[spSpanID] {
+			t.Warnings = append(t.Warnings, "duplicate span ID: "+spSpanID)
 			return
 		}
-		seen[sp.SpanID] = true
+		seen[spSpanID] = true
 		start, e1 := timestamp(sp.Start)
 		end, e2 := timestamp(sp.End)
 		if e1 != nil || e2 != nil || end.Before(start) {
-			t.Warnings = append(t.Warnings, "invalid timestamps on span "+sp.SpanID)
+			t.Warnings = append(t.Warnings, "invalid timestamps on span "+spSpanID)
 			return
 		}
 		attrs := map[string]any{}
@@ -144,7 +149,7 @@ func Parse(data []byte) (*Trace, error) {
 		for _, ev := range sp.Events {
 			ts, err := timestamp(ev.Time)
 			if err != nil {
-				t.Warnings = append(t.Warnings, "invalid event timestamp on span "+sp.SpanID)
+				t.Warnings = append(t.Warnings, "invalid event timestamp on span "+spSpanID)
 				continue
 			}
 			ea := map[string]any{}
@@ -153,7 +158,7 @@ func Parse(data []byte) (*Trace, error) {
 			}
 			events = append(events, Event{Name: ev.Name, Time: ts, Attributes: ea})
 		}
-		s := &Span{TraceID: sp.TraceID, SpanID: sp.SpanID, ParentSpanID: sp.Parent, Service: svc, Name: sp.Name, Kind: int(sp.Kind), Start: start, End: end, Status: status, Attributes: attrs, Events: events}
+		s := &Span{TraceID: spTraceID, SpanID: spSpanID, ParentSpanID: spParentID, Service: svc, Name: sp.Name, Kind: int(sp.Kind), Start: start, End: end, Status: status, Attributes: attrs, Events: events}
 		t.Spans = append(t.Spans, s)
 	}
 	for _, b := range r.Batches {
@@ -296,4 +301,21 @@ func (e *enumInt) UnmarshalJSON(b []byte) error {
 		*e = 0
 	}
 	return nil
+}
+
+func normalizeID(s string, expectedBytes int) string {
+	s = strings.TrimSpace(s)
+	expectedHexLen := expectedBytes * 2
+	if len(s) == expectedHexLen {
+		if _, err := hex.DecodeString(s); err == nil {
+			return strings.ToLower(s)
+		}
+	}
+	if b, err := base64.StdEncoding.DecodeString(s); err == nil && len(b) == expectedBytes {
+		return hex.EncodeToString(b)
+	}
+	if b, err := base64.RawStdEncoding.DecodeString(s); err == nil && len(b) == expectedBytes {
+		return hex.EncodeToString(b)
+	}
+	return s
 }

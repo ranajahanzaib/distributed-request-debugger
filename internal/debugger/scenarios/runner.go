@@ -204,20 +204,31 @@ func (r *Runner) checkout(ctx context.Context, key string) (Checkout, error) {
 func (r *Runner) diagnose(ctx context.Context, id string) (*analysis.Report, error) {
 	end := time.Now().Add(8 * time.Second)
 	var last error
+	var latest *analysis.Report
 	for time.Now().Before(end) {
 		c, cancel := context.WithTimeout(ctx, 3*time.Second)
 		t, e := r.Tempo.Fetch(c, id)
 		cancel()
 		if e == nil {
 			v := analysis.Analyze(t)
-			return &v, nil
+			latest = &v
+			if v.TraceComplete {
+				return &v, nil
+			}
+		} else {
+			last = e
 		}
-		last = e
 		select {
 		case <-ctx.Done():
+			if latest != nil {
+				return latest, nil
+			}
 			return nil, ctx.Err()
 		case <-time.After(250 * time.Millisecond):
 		}
+	}
+	if latest != nil {
+		return latest, nil
 	}
 	return nil, last
 }
