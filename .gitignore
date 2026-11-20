@@ -1,6 +1,8 @@
 .env
 .DS_Store
 /bin/
+/app
+/debugger
 /coverage.out
 /coverage.html
 /artifacts/
